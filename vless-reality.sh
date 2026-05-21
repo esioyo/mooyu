@@ -240,8 +240,8 @@ fi
 # 目标网站
 if [[ -z $domain ]]; then
   echo -e "请输入一个 ${magenta}伪装域名${none}"
-  read -p "(默认: bing.com): " domain
-  [ -z "$domain" ] && domain="bing.com"
+  read -p "(默认: www.msn.com): " domain
+  [ -z "$domain" ] && domain="www.msn.com"
 
   echo
   echo
