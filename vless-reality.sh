@@ -89,7 +89,7 @@ apt install -y curl wget sudo net-tools lsof
 echo
 echo -e "${yellow}Xray官方脚本安装版本 ${XRAY_VERSION}$none"
 echo "----------------------------------------------------------------"
-bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -v "${XRAY_VERSION}"
+bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install --version "${XRAY_VERSION}"
 
 # 更新 geodata
 bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install-geodata
