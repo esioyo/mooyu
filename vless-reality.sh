@@ -1,7 +1,7 @@
 # 等待1秒, 避免curl下载脚本的打印与脚本本身的显示冲突, 吃掉了提示用户按回车继续的信息
 sleep 1
 
-echo -e "                     _ ___                   \n ___ ___ __ __ ___ _| |  _|___ __ __   _ ___ \n|-_ |_  |  |  |-_ | _ |   |- _|  |  |_| |_  |\n|___|___|  _  |___|___|_|_|___|  _  |___|___|\n        |_____|               |_____|        "
+echo -e "                     _ ___                   \n ___ ___ __ __ ___ _| |  _|___ __ __   _ ___ \n|-_ |_  |  |  |-_ | _ |   |- _|  |  |_| |_  |\n|___|___|  _  |___|___|_|_|___|  _  |___|___|\n   [...]"
 red='\e[91m'
 green='\e[92m'
 yellow='\e[93m'
@@ -35,6 +35,9 @@ done
 
 # 使用随机 UUID
 default_uuid=$(cat /proc/sys/kernel/random/uuid)
+
+# 指定 Xray 版本
+XRAY_VERSION="v26.1.23"
 
 # 执行脚本带参数
 if [ $# -ge 1 ]; then
@@ -82,11 +85,11 @@ pause
 apt update
 apt install -y curl wget sudo net-tools lsof
 
-# Xray官方脚本 安装最新版本
+# Xray官方脚本 安装指定版本
 echo
-echo -e "${yellow}Xray官方脚本安装最新版本$none"
+echo -e "${yellow}Xray官方脚本安装版本 ${XRAY_VERSION}$none"
 echo "----------------------------------------------------------------"
-bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
+bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -v "${XRAY_VERSION}"
 
 # 更新 geodata
 bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install-geodata
@@ -98,7 +101,7 @@ if [[ -n $uuid ]]; then
   reality_key_seed=$(echo -n ${uuid} | md5sum | head -c 32 | base64 -w 0 | tr '+/' '-_' | tr -d '=')
 
   # 生成私钥公钥
-  # xray x25519 如果接收一个合法的私钥, 会生成对应的公钥. 如果接收一个非法的私钥, 会先"修正"为合法的私钥. 这个"修正"的过程, 会修改其中的一些字节
+  # xray x25519 如果接收一个合法的私钥, 会生成对应的公钥. 如果接收一个非法的私钥, 会先"修正"为合法的私钥. 这个"修正"的过程, 会修改其中的一些字符[...]
   # https://github.dev/XTLS/Xray-core/blob/6830089d3c42483512842369c908f9de75da2eaa/main/commands/all/curve25519.go#L36
   tmp_key=$(echo -n ${reality_key_seed} | xargs xray x25519 -i)
   private_key=$(echo ${tmp_key} | awk '{print $2}')
@@ -184,7 +187,7 @@ if [[ -z $private_key ]]; then
   reality_key_seed=$(echo -n ${uuid} | md5sum | head -c 32 | base64 -w 0 | tr '+/' '-_' | tr -d '=')
 
   # 生成私钥公钥
-  # xray x25519 如果接收一个合法的私钥, 会生成对应的公钥. 如果接收一个非法的私钥, 会先"修正"为合法的私钥. 这个"修正"的过程, 会修改其中的一些字节
+  # xray x25519 如果接收一个合法的私钥, 会生成对应的公钥. 如果接收一个非法的私钥, 会先"修正"为合法的私钥. 这个"修正"的过程, 会修改其中的一些字符[...]
   # https://github.dev/XTLS/Xray-core/blob/6830089d3c42483512842369c908f9de75da2eaa/main/commands/all/curve25519.go#L36
   tmp_key=$(echo -n ${reality_key_seed} | xargs xray x25519 -i)
   default_private_key=$(echo ${tmp_key} | awk '{print $2}')
@@ -365,6 +368,7 @@ echo -e "$yellow SNI = ${cyan}${domain}$none"
 echo -e "$yellow 指纹 (Fingerprint) = ${cyan}${fingerprint}$none"
 echo -e "$yellow 公钥 (PublicKey) = ${cyan}${public_key}${none}"
 echo -e "$yellow ShortId = ${cyan}${shortid}${none}"
+echo -e "$yellow Xray 版本 (Version) = ${cyan}${XRAY_VERSION}${none}"
 
 
 
