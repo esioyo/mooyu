@@ -56,7 +56,7 @@ if [ -d "/root/hysteria" ]; then
             cd /root/hysteria
         
             # Get the current port and password from config.yaml
-            current_port=$(grep -oP 'listen: :\K\d+' config.yaml)
+            current_port=$(grep -oP 'listen: :\K\d+' config.yaml | head -1)
             current_password=$(grep -m 1 'password:' config.yaml | awk -F': ' '{print $2}' | tr -d '[:space:]')
         
             # Prompt the user for a new port and password
@@ -67,12 +67,32 @@ if [ -d "/root/hysteria" ]; then
             read -p "Enter a new password (or press enter to keep the current one [$current_password]): " new_password
             [ -z "$new_password" ] && new_password=$current_password
             echo ""
-        
+            
+            # Ask about port hopping
+            read -p "Enable port hopping? (y/n, default: n): " enable_hopping
+            echo ""
+
             # Update the port and password in config.yaml
             sed -i "s/listen: :${current_port}/listen: :${new_port}/" config.yaml
             sed -i "0,/password: ${current_password}/s//password: ${new_password}/" config.yaml
 
-            
+            # Handle port hopping configuration update
+            if [[ "$enable_hopping" == "y" || "$enable_hopping" == "Y" ]]; then
+                read -p "Enter port hopping range (e.g., 20000-30000): " hopping_range
+                start_port=$(echo $hopping_range | cut -d'-' -f1)
+                end_port=$(echo $hopping_range | cut -d'-' -f2)
+                
+                # Remove old hopping section if exists
+                sed -i '/^\s*hopping:/,/^\s*[^ \t]/{ /^\s*hopping:/!{ /^\s*[^ \t]/!d; }; }' config.yaml
+                
+                # Add hopping configuration
+                sed -i "/listen:/a\\hopping:\\n  ports: \"$start_port:$end_port\"" config.yaml
+                echo "Port hopping enabled: $start_port-$end_port"
+            else
+                # Remove hopping section if exists
+                sed -i '/^\s*hopping:/,/^\s*[^ \t]/{ /^\s*hopping:/!{ /^\s*[^ \t]/!d; }; }' config.yaml
+            fi
+
             # Kill the existing hysteria process, reload systemd and restart the hysteria service
             pkill -f 'hysteria*'
             systemctl daemon-reload
@@ -182,9 +202,24 @@ echo ""
 read -p "Enter a password (or press enter for a random password): " password
 [ -z "$password" ] && password=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | fold -w 16 | head -n 1)
 
+echo ""
+read -p "Enable port hopping? (y/n, default: n): " enable_hopping
+echo ""
+
+# Initialize hopping config
+hopping_config=""
+if [[ "$enable_hopping" == "y" || "$enable_hopping" == "Y" ]]; then
+    read -p "Enter port hopping range (e.g., 20000-30000): " hopping_range
+    hopping_config="hopping:
+  ports: \"$hopping_range\"
+"
+    echo "Port hopping enabled: $hopping_range"
+    echo ""
+fi
+
 # Create new config.yaml template based on your requirement
 config_yaml="listen: :$port
-tls:
+${hopping_config}tls:
   cert: /root/hysteria/ca.crt
   key: /root/hysteria/ca.key
 auth:
