@@ -22,7 +22,7 @@ get_installed_binary_name() {
     grep -oP 'ExecStart=/root/hysteria/\K[^ ]+' /etc/systemd/system/hysteria.service 2>/dev/null | head -1
 }
 
-# 生成 v2rayN 支持的 Hysteria2 单端口 URI。
+# 生成 v2rayN 支持的 Hysteria2 端口 URI。
 build_hysteria_uri() {
     uri_password="$1"
     uri_host="$2"
@@ -56,13 +56,13 @@ WantedBy=multi-user.target
 EOL
 }
 
-# 输出 v2rayN 可导入的单端口链接。
+# 输出 v2rayN 可导入的端口链接。
 print_client_links() {
     link_password="$1"
     link_host="$2"
     link_port="$3"
 
-    echo "v2rayN 单端口分享链接："
+    echo "v2rayN 端口分享链接："
     build_hysteria_uri "$link_password" "$link_host" "$link_port"
     echo ""
 }
@@ -103,12 +103,12 @@ if [ -d "/root/hysteria" ]; then
                 exit 1
             fi
         
-            # 提示用户输入新的单端口和密码。
+            # 提示用户输入新的端口和密码。
             echo ""
-            read -p "请输入新的单端口（直接回车保持当前端口 [$current_port]）：" new_port
+            read -p "请输入新的端口（直接回车保持当前端口 [$current_port]）：" new_port
             [ -z "$new_port" ] && new_port=$current_port
             if ! is_valid_port "$new_port"; then
-                echo "端口格式无效，请输入 1-65535 之间的单个端口。"
+                echo "端口格式无效，请输入 1-65535 之间的端口。"
                 exit 1
             fi
             echo ""
@@ -194,10 +194,10 @@ openssl req -new -x509 -days 36500 -key ca.key -out ca.crt -subj "/CN=bing.com"
 
 # 读取安装参数。
 echo ""
-read -p "请输入单端口（直接回车随机生成）：" port
+read -p "请输入端口（直接回车随机生成）：" port
 [ -z "$port" ] && port=$((RANDOM + 10000))
 if ! is_valid_port "$port"; then
-    echo "端口格式无效，请输入 1-65535 之间的单个端口。"
+    echo "端口格式无效，请输入 1-65535 之间的端口。"
     exit 1
 fi
 
@@ -205,7 +205,7 @@ echo ""
 read -p "请输入密码（直接回车随机生成）：" password
 [ -z "$password" ] && password=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | fold -w 16 | head -n 1)
 
-# 服务端只监听单端口。
+# 服务端监听指定端口。
 listen_value="$port"
 
 # 根据安装参数生成服务端配置。
