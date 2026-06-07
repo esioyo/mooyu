@@ -37,7 +37,7 @@ done
 default_uuid=$(cat /proc/sys/kernel/random/uuid)
 
 # 指定 Xray 版本
-XRAY_VERSION="v26.1.23"
+XRAY_VERSION="v25.10.15"
 
 # 执行脚本带参数
 if [ $# -ge 1 ]; then
