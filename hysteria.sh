@@ -31,19 +31,39 @@ is_valid_port_range() {
     return 1
 }
 
-# 将端口跳跃范围转换为 iptables 支持的端口段。
-to_iptables_port_range() {
-    echo "$1" | tr '-' ':'
-}
-
 # 从现有 systemd 服务中读取已安装的 Hysteria2 二进制文件名。
 get_installed_binary_name() {
     grep -oP 'ExecStart=/root/hysteria/\K[^ ]+' /etc/systemd/system/hysteria.service 2>/dev/null | head -1
 }
 
-# 从现有 systemd 服务中读取端口跳跃范围。
+# 从现有配置中读取监听值。
+get_installed_listen_value() {
+    grep -oP '^listen:\s*:\K[0-9]+(-[0-9]+)?' /root/hysteria/config.yaml 2>/dev/null | head -1
+}
+
+# 从现有配置中读取单端口监听值。
+get_installed_listen_port() {
+    listen_value=$(get_installed_listen_value)
+    if [[ "$listen_value" =~ ^[0-9]+$ ]]; then
+        echo "$listen_value"
+    fi
+}
+
+# 从现有配置中读取端口跳跃范围。
 get_installed_hop_range() {
+    listen_value=$(get_installed_listen_value)
+    if [[ "$listen_value" =~ ^[0-9]+-[0-9]+$ ]]; then
+        echo "$listen_value"
+        return
+    fi
+
+    # 兼容旧版脚本写入 systemd 手动转发规则的已安装实例。
     grep -oP -- '--dport \K[0-9]+:[0-9]+' /etc/systemd/system/hysteria.service 2>/dev/null | head -1 | tr ':' '-'
+}
+
+# 读取端口范围中的第一个端口。
+get_first_port() {
+    echo "$1" | cut -d '-' -f 1
 }
 
 # 生成 v2rayN 支持的 Hysteria2 端口 URI。
@@ -64,16 +84,6 @@ build_hysteria_uri() {
 # 写入 systemd 服务。
 write_systemd_service() {
     service_binary="$1"
-    service_port="$2"
-    service_hop_range="$3"
-
-    port_hopping_start_rules=""
-    port_hopping_stop_rules=""
-    if [ -n "$service_hop_range" ]; then
-        iptables_port_range=$(to_iptables_port_range "$service_hop_range")
-        port_hopping_start_rules="ExecStartPre=/bin/sh -c 'if ! iptables -t nat -C PREROUTING -p udp --dport $iptables_port_range -j REDIRECT --to-ports $service_port 2>/dev/null; then iptables -t nat -A PREROUTING -p udp --dport $iptables_port_range -j REDIRECT --to-ports $service_port; fi'"
-        port_hopping_stop_rules="ExecStopPost=/bin/sh -c 'if iptables -t nat -C PREROUTING -p udp --dport $iptables_port_range -j REDIRECT --to-ports $service_port 2>/dev/null; then iptables -t nat -D PREROUTING -p udp --dport $iptables_port_range -j REDIRECT --to-ports $service_port; fi'"
-    fi
 
     cat > /etc/systemd/system/hysteria.service <<EOL
 [Unit]
@@ -85,10 +95,8 @@ User=root
 WorkingDirectory=/root/hysteria
 CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW
 AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW
-$port_hopping_start_rules
 ExecStart=/root/hysteria/$service_binary server -c /root/hysteria/config.yaml
 ExecReload=/bin/kill -HUP \$MAINPID
-$port_hopping_stop_rules
 Restart=always
 RestartSec=5
 LimitNOFILE=infinity
@@ -138,13 +146,21 @@ if [ -d "/root/hysteria" ]; then
             # 修改现有配置并重启服务。
             cd /root/hysteria
         
-            # 读取当前监听端口、端口跳跃范围以及认证密码。
-            current_port=$(grep -oP 'listen:\s*:\K[0-9]+' config.yaml | head -1)
+            # 读取当前监听值、端口跳跃范围以及认证密码。
+            current_listen_value=$(get_installed_listen_value)
+            current_port=$(get_installed_listen_port)
             current_hop_range=$(get_installed_hop_range)
+            if [ -z "$current_port" ] && [ -n "$current_hop_range" ]; then
+                current_port=$(get_first_port "$current_hop_range")
+            fi
             current_password=$(grep -m 1 'password:' config.yaml | awk -F': ' '{print $2}' | tr -d '[:space:]')
             installed_binary=$(get_installed_binary_name)
             if [ -z "$installed_binary" ]; then
                 echo "无法从 systemd 服务中读取 Hysteria2 二进制文件名。"
+                exit 1
+            fi
+            if [ -z "$current_listen_value" ]; then
+                echo "无法从配置文件中读取 Hysteria2 监听配置。"
                 exit 1
             fi
         
@@ -172,6 +188,11 @@ if [ -d "/root/hysteria" ]; then
             echo ""
 
             listen_value="$new_port"
+            client_port="$new_port"
+            if [ -n "$new_hop_range" ]; then
+                listen_value="$new_hop_range"
+                client_port=$(get_first_port "$new_hop_range")
+            fi
 
             # 更新监听配置和密码。
             sed -i -E "s/^listen: :.*/listen: :${listen_value}/" config.yaml
@@ -180,13 +201,13 @@ if [ -d "/root/hysteria" ]; then
             # 停止旧服务，重写 systemd 服务后再启动。
             systemctl stop hysteria
             pkill -f 'hysteria*'
-            write_systemd_service "$installed_binary" "$new_port" "$new_hop_range"
+            write_systemd_service "$installed_binary"
             systemctl daemon-reload
             systemctl start hysteria
 
             # 输出客户端导入链接。
             PUBLIC_IP=$(curl -s https://api.ipify.org)
-            print_client_links "$new_password" "$PUBLIC_IP" "$new_port" "$new_hop_range"
+            print_client_links "$new_password" "$PUBLIC_IP" "$client_port" "$new_hop_range"
             exit 0
             ;;
         3)
@@ -267,8 +288,13 @@ echo ""
 read -p "请输入密码（直接回车随机生成）：" password
 [ -z "$password" ] && password=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | fold -w 16 | head -n 1)
 
-# 服务端监听指定端口，端口跳跃范围由 systemd 防火墙规则转发到该端口。
+# 服务端按官方内置端口范围格式监听，未启用端口跳跃时监听单端口。
 listen_value="$port"
+client_port="$port"
+if [ -n "$hop_range" ]; then
+    listen_value="$hop_range"
+    client_port=$(get_first_port "$hop_range")
+fi
 
 # 根据安装参数生成服务端配置。
 config_yaml="listen: :$listen_value
@@ -314,7 +340,7 @@ resolver:
 echo "$config_yaml" > config.yaml
 
 # 创建 systemd 服务。
-write_systemd_service "$BINARY_NAME" "$port" "$hop_range"
+write_systemd_service "$BINARY_NAME"
 
 systemctl daemon-reload
 systemctl enable hysteria > /dev/null 2>&1
@@ -323,4 +349,4 @@ systemctl start hysteria
 # 生成并输出客户端链接。
 PUBLIC_IP=$(curl -s https://api.ipify.org)
 echo ""
-print_client_links "$password" "$PUBLIC_IP" "$port" "$hop_range"
+print_client_links "$password" "$PUBLIC_IP" "$client_port" "$hop_range"
