@@ -1,34 +1,67 @@
 #!/bin/bash
 
+# 确认脚本以 root 权限运行，避免写入系统路径时静默失败。
+require_root() {
+    if [ "$EUID" -ne 0 ]; then
+        echo "请使用 root 用户执行此脚本。"
+        exit 1
+    fi
+}
+
+# 执行关键命令，失败时立即中止并输出明确原因。
+run_or_exit() {
+    error_message="$1"
+    shift
+
+    if ! "$@"; then
+        echo "$error_message"
+        exit 1
+    fi
+}
+
+# 打印 Hysteria 服务最近日志，用于定位端口监听或权限失败。
+print_hysteria_logs() {
+    if command -v journalctl > /dev/null 2>&1; then
+        echo "Hysteria 服务最近日志："
+        journalctl -u hysteria -n 30 --no-pager
+    fi
+}
+
+# 启动 Hysteria 服务并检查结果，失败时输出可诊断日志。
+start_hysteria_or_exit() {
+    if ! systemctl start hysteria; then
+        echo "Hysteria 服务启动失败，请检查监听端口、防火墙工具和配置文件。"
+        print_hysteria_logs
+        exit 1
+    fi
+}
+
 # 检查并安装脚本运行所需依赖。
 install_required_packages() {
-    REQUIRED_PACKAGES=("curl" "openssl" "wget" "iptables")
+    REQUIRED_PACKAGES=("curl" "openssl" "wget" "iptables" "nftables" "ca-certificates")
+    MISSING_PACKAGES=()
+
+    if ! command -v apt-get > /dev/null 2>&1; then
+        echo "未检测到 apt-get，请手动安装 curl、openssl、wget、iptables、nftables 和 ca-certificates。"
+        exit 1
+    fi
+
     for pkg in "${REQUIRED_PACKAGES[@]}"; do
-        if ! command -v $pkg &> /dev/null; then
-            apt-get update > /dev/null 2>&1
-            apt-get install -y $pkg > /dev/null 2>&1
+        if ! dpkg -s "$pkg" > /dev/null 2>&1; then
+            MISSING_PACKAGES+=("$pkg")
         fi
     done
+
+    if [ "${#MISSING_PACKAGES[@]}" -gt 0 ]; then
+        run_or_exit "更新软件源失败，请检查系统网络或软件源配置。" apt-get update
+        run_or_exit "安装运行依赖失败，请检查 apt 输出信息。" apt-get install -y "${MISSING_PACKAGES[@]}"
+    fi
 }
 
 # 校验单个端口是否在 1-65535 范围内。
 is_valid_port() {
     port_value="$1"
     [[ "$port_value" =~ ^[0-9]+$ ]] && [ "$port_value" -ge 1 ] && [ "$port_value" -le 65535 ]
-}
-
-# 校验 Hysteria 端口跳跃范围。
-is_valid_port_range() {
-    port_range_value="$1"
-
-    if [[ "$port_range_value" =~ ^([0-9]+)-([0-9]+)$ ]]; then
-        start_port="${BASH_REMATCH[1]}"
-        end_port="${BASH_REMATCH[2]}"
-        is_valid_port "$start_port" && is_valid_port "$end_port" && [ "$start_port" -lt "$end_port" ]
-        return
-    fi
-
-    return 1
 }
 
 # 从现有 systemd 服务中读取已安装的 Hysteria2 二进制文件名。
@@ -38,7 +71,7 @@ get_installed_binary_name() {
 
 # 从现有配置中读取监听值。
 get_installed_listen_value() {
-    grep -oP '^listen:\s*:\K[0-9]+(-[0-9]+)?' /root/hysteria/config.yaml 2>/dev/null | head -1
+    grep -oP '^listen:\s*:\K[0-9]+' /root/hysteria/config.yaml 2>/dev/null | head -1
 }
 
 # 从现有配置中读取单端口监听值。
@@ -49,34 +82,13 @@ get_installed_listen_port() {
     fi
 }
 
-# 从现有配置中读取端口跳跃范围。
-get_installed_hop_range() {
-    listen_value=$(get_installed_listen_value)
-    if [[ "$listen_value" =~ ^[0-9]+-[0-9]+$ ]]; then
-        echo "$listen_value"
-        return
-    fi
-
-    # 兼容旧版脚本写入 systemd 手动转发规则的已安装实例。
-    grep -oP -- '--dport \K[0-9]+:[0-9]+' /etc/systemd/system/hysteria.service 2>/dev/null | head -1 | tr ':' '-'
-}
-
-# 读取端口范围中的第一个端口。
-get_first_port() {
-    echo "$1" | cut -d '-' -f 1
-}
-
-# 生成 v2rayN 支持的 Hysteria2 端口 URI。
+# 生成 v2rayN 支持的 Hysteria2 单端口 URI。
 build_hysteria_uri() {
     uri_password="$1"
     uri_host="$2"
     uri_listen_port="$3"
-    uri_hop_range="$4"
 
-    uri_query="insecure=1&allowInsecure=1&sni=bing.com"
-    if [ -n "$uri_hop_range" ]; then
-        uri_query="${uri_query}&mport=${uri_hop_range}"
-    fi
+    uri_query="insecure=1&allowInsecure=1&sni=www.msn.com"
 
     echo "hysteria2://$uri_password@$uri_host:$uri_listen_port/?$uri_query"
 }
@@ -111,13 +123,22 @@ print_client_links() {
     link_password="$1"
     link_host="$2"
     link_listen_port="$3"
-    link_hop_range="$4"
-    client_uri=$(build_hysteria_uri "$link_password" "$link_host" "$link_listen_port" "$link_hop_range")
+    client_uri=$(build_hysteria_uri "$link_password" "$link_host" "$link_listen_port")
 
     echo "v2rayN 分享链接："
     echo "$client_uri"
     echo ""
+
+    echo "官方客户端配置示例："
+    echo "server: $link_host:$link_listen_port"
+    echo "auth: $link_password"
+    echo "tls:"
+    echo "  sni: www.msn.com"
+    echo "  insecure: true"
+    echo ""
 }
+
+require_root
 
 # 检查是否已经安装 Hysteria。
 if [ -d "/root/hysteria" ]; then
@@ -146,13 +167,9 @@ if [ -d "/root/hysteria" ]; then
             # 修改现有配置并重启服务。
             cd /root/hysteria
         
-            # 读取当前监听值、端口跳跃范围以及认证密码。
+            # 读取当前监听端口以及认证密码。
             current_listen_value=$(get_installed_listen_value)
             current_port=$(get_installed_listen_port)
-            current_hop_range=$(get_installed_hop_range)
-            if [ -z "$current_port" ] && [ -n "$current_hop_range" ]; then
-                current_port=$(get_first_port "$current_hop_range")
-            fi
             current_password=$(grep -m 1 'password:' config.yaml | awk -F': ' '{print $2}' | tr -d '[:space:]')
             installed_binary=$(get_installed_binary_name)
             if [ -z "$installed_binary" ]; then
@@ -164,7 +181,7 @@ if [ -d "/root/hysteria" ]; then
                 exit 1
             fi
         
-            # 提示用户输入新的监听端口、端口跳跃范围和密码。
+            # 提示用户输入新的监听端口和密码。
             echo ""
             read -p "请输入新的监听端口（直接回车保持当前值 [$current_port]）：" new_port
             [ -z "$new_port" ] && new_port=$current_port
@@ -172,27 +189,11 @@ if [ -d "/root/hysteria" ]; then
                 echo "监听端口格式无效，请输入 1-65535 之间的单端口。"
                 exit 1
             fi
-            echo ""
-            read -p "请输入新的端口跳跃范围（示例 20000-50000，直接回车保持当前值 [$current_hop_range]，输入 关闭 可停用）：" new_hop_range
-            if [ -z "$new_hop_range" ]; then
-                new_hop_range=$current_hop_range
-            elif [ "$new_hop_range" = "关闭" ]; then
-                new_hop_range=""
-            elif ! is_valid_port_range "$new_hop_range"; then
-                echo "端口跳跃范围格式无效，请输入起始端口小于结束端口的端口范围。"
-                exit 1
-            fi
-            echo ""
             read -p "请输入新的密码（直接回车保持当前值 [$current_password]）：" new_password
             [ -z "$new_password" ] && new_password=$current_password
             echo ""
 
             listen_value="$new_port"
-            client_port="$new_port"
-            if [ -n "$new_hop_range" ]; then
-                listen_value="$new_hop_range"
-                client_port=$(get_first_port "$new_hop_range")
-            fi
 
             # 更新监听配置和密码。
             sed -i -E "s/^listen: :.*/listen: :${listen_value}/" config.yaml
@@ -202,12 +203,12 @@ if [ -d "/root/hysteria" ]; then
             systemctl stop hysteria
             pkill -f 'hysteria*'
             write_systemd_service "$installed_binary"
-            systemctl daemon-reload
-            systemctl start hysteria
+            run_or_exit "重新加载 systemd 失败。" systemctl daemon-reload
+            start_hysteria_or_exit
 
             # 输出客户端导入链接。
             PUBLIC_IP=$(curl -s https://api.ipify.org)
-            print_client_links "$new_password" "$PUBLIC_IP" "$client_port" "$new_hop_range"
+            print_client_links "$new_password" "$PUBLIC_IP" "$new_port"
             exit 0
             ;;
         3)
@@ -259,14 +260,14 @@ esac
 
 
 # 下载 Hysteria2 二进制文件。
-mkdir -p /root/hysteria
-cd /root/hysteria
-wget -q "https://github.com/apernet/hysteria/releases/latest/download/$BINARY_NAME"
-chmod 755 "$BINARY_NAME"
+run_or_exit "创建 Hysteria 安装目录失败。" mkdir -p /root/hysteria
+run_or_exit "进入 Hysteria 安装目录失败。" cd /root/hysteria
+run_or_exit "下载 Hysteria2 二进制文件失败，请检查网络或架构是否受支持。" wget -q -O "$BINARY_NAME" "https://github.com/apernet/hysteria/releases/latest/download/$BINARY_NAME"
+run_or_exit "设置 Hysteria2 二进制文件权限失败。" chmod 755 "$BINARY_NAME"
 
 # 创建自签名 TLS 证书。
-openssl ecparam -genkey -name prime256v1 -out ca.key
-openssl req -new -x509 -days 36500 -key ca.key -out ca.crt -subj "/CN=bing.com"
+run_or_exit "生成 TLS 私钥失败。" openssl ecparam -genkey -name prime256v1 -out ca.key
+run_or_exit "生成自签名 TLS 证书失败。" openssl req -new -x509 -days 36500 -key ca.key -out ca.crt -subj "/C=US/CN=www.msn.com"
 
 # 读取安装参数。
 echo ""
@@ -278,23 +279,11 @@ if ! is_valid_port "$port"; then
 fi
 
 echo ""
-read -p "请输入端口跳跃范围（示例 20000-50000，直接回车不启用）：" hop_range
-if [ -n "$hop_range" ] && ! is_valid_port_range "$hop_range"; then
-    echo "端口跳跃范围格式无效，请输入起始端口小于结束端口的端口范围。"
-    exit 1
-fi
-
-echo ""
 read -p "请输入密码（直接回车随机生成）：" password
 [ -z "$password" ] && password=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | fold -w 16 | head -n 1)
 
-# 服务端按官方内置端口范围格式监听，未启用端口跳跃时监听单端口。
+# 服务端监听单端口。
 listen_value="$port"
-client_port="$port"
-if [ -n "$hop_range" ]; then
-    listen_value="$hop_range"
-    client_port=$(get_first_port "$hop_range")
-fi
 
 # 根据安装参数生成服务端配置。
 config_yaml="listen: :$listen_value
@@ -342,11 +331,15 @@ echo "$config_yaml" > config.yaml
 # 创建 systemd 服务。
 write_systemd_service "$BINARY_NAME"
 
-systemctl daemon-reload
-systemctl enable hysteria > /dev/null 2>&1
-systemctl start hysteria
+run_or_exit "重新加载 systemd 失败。" systemctl daemon-reload
+run_or_exit "设置 Hysteria 服务开机自启失败。" systemctl enable hysteria
+start_hysteria_or_exit
 
 # 生成并输出客户端链接。
 PUBLIC_IP=$(curl -s https://api.ipify.org)
+if [ -z "$PUBLIC_IP" ]; then
+    echo "获取服务器公网 IP 失败，请手动替换客户端配置中的服务器地址。"
+    PUBLIC_IP="服务器地址"
+fi
 echo ""
-print_client_links "$password" "$PUBLIC_IP" "$client_port" "$hop_range"
+print_client_links "$password" "$PUBLIC_IP" "$port"
