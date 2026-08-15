@@ -4,7 +4,7 @@ set -o pipefail
 # sing-box VLESS Reality 安装脚本。
 sleep 1
 
-echo -e "                     _ ___                   \n ___ ___ __ __ ___ _| |  _|___ __ __   _ ___ \n|-_ |_  |  |  |-_ | _ |   |- _|  |  |_| |_  |\n|___|___|  _  |___|___|_|_|___|  _  |___|___|\n        |_____|               |_____|        "
+echo -e "                     _ ___                   \n ___ ___ __ __ ___ _| |  _|___ __ __   _ ___ \n|-_ |_  |  |  |-_ | _ |   |- _|  |  |_| |_  |\n|___|___|  _  |___|___|_|_|___|  _  |___|___|\n[...]
 
 red='\e[91m'
 green='\e[92m'
@@ -112,7 +112,7 @@ install_sing_box() {
     apt install -y curl wget sudo net-tools lsof
 
     echo
-    echo -e "${yellow}sing-box 官方脚本安装最新稳定版本$none"
+    echo -e "${yellow}sing-box 官方脚本安装最新稳定版本${none}"
     echo "----------------------------------------------------------------"
 
     if ! curl -fsSL https://sing-box.app/install.sh | sh; then
@@ -235,8 +235,8 @@ install_sing_box() {
 
     if [[ -z $domain ]]; then
         echo -e "请输入一个 ${magenta}伪装域名${none}"
-        read -p "(默认: www.msn.com): " domain
-        [ -z "$domain" ] && domain="www.msn.com"
+        read -p "(默认: www.msn.cn): " domain
+        [ -z "$domain" ] && domain="www.msn.cn"
 
         echo
         echo
@@ -353,7 +353,7 @@ EOF
 
     echo
     echo "---------- VLESS Reality URL ----------"
-    vless_reality_url="vless://${uuid}@${ip}:${port}?flow=xtls-rprx-vision&encryption=none&type=tcp&security=reality&sni=${domain}&fp=${fingerprint}&pbk=${public_key}&sid=${shortid}&spx=${spiderx}&#${ip}"
+    vless_reality_url="vless://${uuid}@${ip}:${port}?flow=xtls-rprx-vision&encryption=none&type=tcp&security=reality&sni=${domain}&fp=${fingerprint}&pbk=${public_key}&sid=${shortid}&spx=${spiderx}"
     echo -e "${cyan}${vless_reality_url}${none}"
     echo
     echo "---------- END -------------"
