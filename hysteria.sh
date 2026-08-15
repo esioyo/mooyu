@@ -88,7 +88,7 @@ build_hysteria_uri() {
     uri_host="$2"
     uri_listen_port="$3"
 
-    uri_query="insecure=1&allowInsecure=1&sni=www.msn.com"
+    uri_query="insecure=1&allowInsecure=1&sni=www.msn.cn"
 
     echo "hysteria2://$uri_password@$uri_host:$uri_listen_port/?$uri_query"
 }
@@ -133,7 +133,7 @@ print_client_links() {
     echo "server: $link_host:$link_listen_port"
     echo "auth: $link_password"
     echo "tls:"
-    echo "  sni: www.msn.com"
+    echo "  sni: www.msn.cn"
     echo "  insecure: true"
     echo ""
 }
@@ -197,7 +197,7 @@ if [ -d "/root/hysteria" ]; then
 
             # 更新监听配置和密码。
             sed -i -E "s/^listen: :.*/listen: :${listen_value}/" config.yaml
-            awk -v new_password="$new_password" 'BEGIN{updated=0} !updated && /^[[:space:]]*password:/ { print "  password: " new_password; updated=1; next } { print }' config.yaml > config.yaml.tmp && mv config.yaml.tmp config.yaml
+            awk -v new_password="$new_password" 'BEGIN{updated=0} !updated && /^[[:space:]]*password:/ { print "  password: " new_password; updated=1; next } { print }' config.yaml > config.yaml.tmp && mv config.yaml.tmp config.yaml || true
 
             # 停止旧服务，重写 systemd 服务后再启动。
             systemctl stop hysteria
@@ -267,7 +267,7 @@ run_or_exit "设置 Hysteria2 二进制文件权限失败。" chmod 755 "$BINARY
 
 # 创建自签名 TLS 证书。
 run_or_exit "生成 TLS 私钥失败。" openssl ecparam -genkey -name prime256v1 -out ca.key
-run_or_exit "生成自签名 TLS 证书失败。" openssl req -new -x509 -days 36500 -key ca.key -out ca.crt -subj "/C=US/CN=www.msn.com"
+run_or_exit "生成自签名 TLS 证书失败。" openssl req -new -x509 -days 36500 -key ca.key -out ca.crt -subj "/C=US/CN=www.msn.cn"
 
 # 读取安装参数。
 echo ""
