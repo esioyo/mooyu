@@ -4,8 +4,6 @@ set -o pipefail
 # sing-box VLESS Reality 安装脚本。
 sleep 1
 
-echo -e "                     _ ___                   \n ___ ___ __ __ ___ _| |  _|___ __ __   _ ___ \n|-_ |_  |  |  |-_ | _ |   |- _|  |  |_| |_  |\n|___|___|  _  |___|___|_|_|___|  _  |___|___|\n[...]
-
 red='\e[91m'
 green='\e[92m'
 yellow='\e[93m'
