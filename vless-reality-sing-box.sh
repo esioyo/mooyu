@@ -4,7 +4,7 @@ set -o pipefail
 # sing-box VLESS Reality 安装脚本。
 sleep 1
 
-echo -e "                     _ ___                   \n ___ ___ __ __ ___ _| |  _|___ __ __   _ ___ \n|-_ |_  |  |  |-_ | _ |   |- _|  |  |_| |_  |\n|___|___|  _  |___|___|_|_|___|  _  |___|___|\n[...]
+echo -e "                     _ ___                   \n ___ ___ __ __ ___ _| |  _|___ __ __   _ ___ \n|-_ |_  |  |  |-_ | _ |   |- _|  |  |_| |_  |\n|___|___|  _  |___|___|_|_|___|  _  |___|___|\n[..[...]"
 
 red='\e[91m'
 green='\e[92m'
@@ -157,7 +157,7 @@ install_sing_box() {
     if [[ -z $port ]]; then
         default_port=443
         while :; do
-            read -p "$(echo -e "请输入端口 [${magenta}1-65535${none}] Input port (默认Default ${cyan}${default_port}$none):")" port
+            read -p "请输入端口 [${magenta}1-65535${none}] Input port (默认Default ${cyan}${default_port}${none}): " port
             [ -z "$port" ] && port=$default_port
             if validate_port "${port}"; then
                 echo
@@ -173,8 +173,8 @@ install_sing_box() {
 
     if [[ -z $uuid ]]; then
         while :; do
-            echo -e "请输入 "${yellow}"UUID"${none}" "
-            read -p "$(echo -e "(默认ID: ${cyan}${default_uuid}$none):")" uuid
+            echo -e "请输入 ${yellow}UUID${none}"
+            read -p "默认ID: ${cyan}${default_uuid}${none}: " uuid
             [ -z "$uuid" ] && uuid=$default_uuid
             if validate_uuid "${uuid}"; then
                 echo
@@ -193,17 +193,17 @@ install_sing_box() {
         default_private_key=${private_key}
         default_public_key=${public_key}
 
-        echo -e "请输入 "${yellow}"x25519 Private Key"${none}" x25519私钥 :"
-        read -p "$(echo -e "(默认私钥 Private Key: ${cyan}${default_private_key}$none):")" private_key
+        echo -e "请输入 ${yellow}x25519 Private Key${none} x25519私钥 :"
+        read -p "默认私钥 Private Key: ${cyan}${default_private_key}${none}: " private_key
         if [[ -z "$private_key" ]]; then
             private_key=$default_private_key
             public_key=$default_public_key
         else
             echo -e "${yellow}sing-box 无法从手动输入的私钥反算公钥，请同时输入对应公钥。$none"
-            read -p "$(echo -e "请输入 x25519 Public Key 公钥:")" public_key
+            read -p "请输入 x25519 Public Key 公钥: " public_key
             while [[ -z "$public_key" ]]; do
                 error
-                read -p "$(echo -e "请输入 x25519 Public Key 公钥:")" public_key
+                read -p "请输入 x25519 Public Key 公钥: " public_key
             done
         fi
 
@@ -218,8 +218,8 @@ install_sing_box() {
     if [[ -z $shortid ]]; then
         default_shortid=$(echo -n ${uuid} | sha1sum | head -c 16)
         while :; do
-            echo -e "请输入 "${yellow}"ShortID"${none}" :"
-            read -p "$(echo -e "(默认ShortID: ${cyan}${default_shortid}$none):")" shortid
+            echo -e "请输入 ${yellow}ShortID${none} :"
+            read -p "默认ShortID: ${cyan}${default_shortid}${none}: " shortid
             [ -z "$shortid" ] && shortid=$default_shortid
             if validate_shortid "${shortid}"; then
                 echo
@@ -235,7 +235,7 @@ install_sing_box() {
 
     if [[ -z $domain ]]; then
         echo -e "请输入一个 ${magenta}伪装域名${none}"
-        read -p "(默认: www.msn.cn): " domain
+        read -p "默认: www.msn.cn: " domain
         [ -z "$domain" ] && domain="www.msn.cn"
 
         echo
@@ -344,7 +344,7 @@ EOF
     echo -e "$yellow 用户ID (UUID) = $cyan${uuid}$none"
     echo -e "$yellow 流控 (Flow) = ${cyan}xtls-rprx-vision${none}"
     echo -e "$yellow 传输协议 (Network) = ${cyan}tcp/raw$none"
-    echo -e "$yellow 底层传输安全 (TLS) = ${cyan}reality$none"
+    echo -e "$yellow 底层传输安全 (TLS) = ${cyan}reality${none}"
     echo -e "$yellow SNI = ${cyan}${domain}$none"
     echo -e "$yellow 指纹 (Fingerprint) = ${cyan}${fingerprint}$none"
     echo -e "$yellow 公钥 (PublicKey) = ${cyan}${public_key}${none}"
@@ -368,7 +368,7 @@ uninstall() {
     echo
     echo -e "$red========== 卸载 sing-box ==========$none"
     echo
-    read -p "$(echo -e "确认卸载吗？这将删除 sing-box 相关文件 [y/${cyan}N${none}]: ")" confirm
+    read -p "确认卸载吗？这将删除 sing-box 相关文件 [y/${cyan}N${none}]: " confirm
 
     if [[ ! "$confirm" =~ ^[yY]$ ]]; then
         echo -e "$yellow已取消卸载$none"
@@ -434,7 +434,7 @@ main() {
 
     while true; do
         show_menu
-        read -p "$(echo -e "请选择 [${cyan}0-2${none}]: ")" choice
+        read -p "请选择 [${cyan}0-2${none}]: " choice
 
         case $choice in
             1)
@@ -456,4 +456,3 @@ main() {
 }
 
 main "$@"
-
