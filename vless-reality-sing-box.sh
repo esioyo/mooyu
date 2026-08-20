@@ -4,7 +4,7 @@ set -o pipefail
 # sing-box VLESS Reality 安装脚本。
 sleep 1
 
-echo -e "                     _ ___                   \n ___ ___ __ __ ___ _| |  _|___ __ __   _ ___ \n|-_ |_  |  |  |-_ | _ |   |- _|  |  |_| |_  |\n|___|___|  _  |___|___|_|_|___|  _  |___|___|\n[..[...]"
+echo -e "                     _ ___                   \n ___ ___ __ __ ___ _| |  _|___ __ __   _ ___ \n|-_ |_  |  |  |-_ | _ |   |- _|  |  |_| |_  |\n|___|___|  _  |___|___|_|_|___|  _  |___|___|\n[...]
 
 red='\e[91m'
 green='\e[92m'
@@ -157,7 +157,7 @@ install_sing_box() {
     if [[ -z $port ]]; then
         default_port=443
         while :; do
-            read -p "请输入端口 [${magenta}1-65535${none}] Input port (默认Default ${cyan}${default_port}${none}): " port
+            read -p "请输入端口 [\[${magenta}\]1-65535\[${none}\]] Input port (默认Default \[${cyan}\]${default_port}\[${none}\]): " port
             [ -z "$port" ] && port=$default_port
             if validate_port "${port}"; then
                 echo
@@ -174,7 +174,7 @@ install_sing_box() {
     if [[ -z $uuid ]]; then
         while :; do
             echo -e "请输入 ${yellow}UUID${none}"
-            read -p "默认ID: ${cyan}${default_uuid}${none}: " uuid
+            read -p "默认ID: \[${cyan}\]${default_uuid}\[${none}\]: " uuid
             [ -z "$uuid" ] && uuid=$default_uuid
             if validate_uuid "${uuid}"; then
                 echo
@@ -194,7 +194,7 @@ install_sing_box() {
         default_public_key=${public_key}
 
         echo -e "请输入 ${yellow}x25519 Private Key${none} x25519私钥 :"
-        read -p "默认私钥 Private Key: ${cyan}${default_private_key}${none}: " private_key
+        read -p "默认私钥 Private Key: \[${cyan}\]${default_private_key}\[${none}\]: " private_key
         if [[ -z "$private_key" ]]; then
             private_key=$default_private_key
             public_key=$default_public_key
@@ -219,7 +219,7 @@ install_sing_box() {
         default_shortid=$(echo -n ${uuid} | sha1sum | head -c 16)
         while :; do
             echo -e "请输入 ${yellow}ShortID${none} :"
-            read -p "默认ShortID: ${cyan}${default_shortid}${none}: " shortid
+            read -p "默认ShortID: \[${cyan}\]${default_shortid}\[${none}\]: " shortid
             [ -z "$shortid" ] && shortid=$default_shortid
             if validate_shortid "${shortid}"; then
                 echo
@@ -368,7 +368,7 @@ uninstall() {
     echo
     echo -e "$red========== 卸载 sing-box ==========$none"
     echo
-    read -p "确认卸载吗？这将删除 sing-box 相关文件 [y/${cyan}N${none}]: " confirm
+    read -p "确认卸载吗？这将删除 sing-box 相关文件 [y/\[${cyan}\]N\[${none}\]]: " confirm
 
     if [[ ! "$confirm" =~ ^[yY]$ ]]; then
         echo -e "$yellow已取消卸载$none"
@@ -434,7 +434,7 @@ main() {
 
     while true; do
         show_menu
-        read -p "请选择 [${cyan}0-2${none}]: " choice
+        read -p "请选择 [\[${cyan}\]0-2\[${none}\]]: " choice
 
         case $choice in
             1)
